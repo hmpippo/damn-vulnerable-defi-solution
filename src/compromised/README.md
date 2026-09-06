@@ -19,3 +19,6 @@ A related on-chain exchange is selling (absurdly overpriced) collectibles called
 This price is fetched from an on-chain oracle, based on 3 trusted reporters: `0x188...088`, `0xA41...9D8` and `0xab3...a40`.
 
 Starting with just 0.1 ETH in balance, pass the challenge by rescuing all ETH available in the exchange. Then deposit the funds into the designated recovery account.
+
+0x7d15bba26c523683bfc3dc7cdc5d1b8a2744447597cf4da1705cf6c993063744
+0x68bd020ad186b647a691c6a5c0c1529f21ecd09dcc45241402ac60ba377c4159

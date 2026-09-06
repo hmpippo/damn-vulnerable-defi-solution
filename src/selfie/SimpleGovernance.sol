@@ -36,11 +36,7 @@ contract SimpleGovernance is ISimpleGovernance {
         actionId = _actionCounter;
 
         _actions[actionId] = GovernanceAction({
-            target: target,
-            value: value,
-            proposedAt: uint64(block.timestamp),
-            executedAt: 0,
-            data: data
+            target: target, value: value, proposedAt: uint64(block.timestamp), executedAt: 0, data: data
         });
 
         unchecked {

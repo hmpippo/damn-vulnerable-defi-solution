@@ -123,6 +123,7 @@ contract TheRewarderDistributor {
 
         // update state
         distributions[token].claims[msg.sender][wordPosition] = currentWord | newBits;
+        // @audit remaining = current batch remaining, but minus multiple batch
         distributions[token].remaining -= amount;
 
         return true;

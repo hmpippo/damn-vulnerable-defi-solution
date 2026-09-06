@@ -122,8 +122,9 @@ contract WalletRegistry is IProxyCreationCallback, Ownable {
     }
 
     function _getFallbackManager(address payable wallet) private view returns (address) {
-        return abi.decode(
-            Safe(wallet).getStorageAt(uint256(keccak256("fallback_manager.handler.address")), 0x20), (address)
-        );
+        return
+            abi.decode(
+                Safe(wallet).getStorageAt(uint256(keccak256("fallback_manager.handler.address")), 0x20), (address)
+            );
     }
 }

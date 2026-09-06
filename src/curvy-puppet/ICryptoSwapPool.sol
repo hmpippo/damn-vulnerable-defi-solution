@@ -76,10 +76,7 @@ interface ICryptoSwapPool {
         uint256 _new_ma_half_time
     ) external;
     function exchange(uint256 i, uint256 j, uint256 dx, uint256 min_dy) external payable returns (uint256);
-    function exchange(uint256 i, uint256 j, uint256 dx, uint256 min_dy, bool use_eth)
-        external
-        payable
-        returns (uint256);
+    function exchange(uint256 i, uint256 j, uint256 dx, uint256 min_dy, bool use_eth) external payable returns (uint256);
     function exchange(uint256 i, uint256 j, uint256 dx, uint256 min_dy, bool use_eth, address receiver)
         external
         payable
@@ -142,11 +139,8 @@ interface ICryptoSwapPool {
     function ramp_A_gamma(uint256 future_A, uint256 future_gamma, uint256 future_time) external;
     function remove_liquidity(uint256 _amount, uint256[2] memory min_amounts) external;
     function remove_liquidity(uint256 _amount, uint256[2] memory min_amounts, bool use_eth) external;
-    function remove_liquidity(uint256 _amount, uint256[2] memory min_amounts, bool use_eth, address receiver)
-        external;
-    function remove_liquidity_one_coin(uint256 token_amount, uint256 i, uint256 min_amount)
-        external
-        returns (uint256);
+    function remove_liquidity(uint256 _amount, uint256[2] memory min_amounts, bool use_eth, address receiver) external;
+    function remove_liquidity_one_coin(uint256 token_amount, uint256 i, uint256 min_amount) external returns (uint256);
     function remove_liquidity_one_coin(uint256 token_amount, uint256 i, uint256 min_amount, bool use_eth)
         external
         returns (uint256);

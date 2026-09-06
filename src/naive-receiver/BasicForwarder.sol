@@ -101,4 +101,8 @@ contract BasicForwarder is EIP712 {
     function getRequestTypehash() external pure returns (bytes32) {
         return _REQUEST_TYPEHASH;
     }
+
+    function getDigest(Request calldata request) external view returns (bytes32) {
+        return _hashTypedData(getDataHash(request));
+    }
 }

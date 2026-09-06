@@ -55,12 +55,8 @@ interface IStableSwap {
     function owner() external view returns (address);
     function ramp_A(uint256 _future_A, uint256 _future_time) external;
     function remove_liquidity(uint256 _amount, uint256[2] memory _min_amounts) external returns (uint256[2] memory);
-    function remove_liquidity_imbalance(uint256[2] memory _amounts, uint256 _max_burn_amount)
-        external
-        returns (uint256);
-    function remove_liquidity_one_coin(uint256 _token_amount, int128 i, uint256 _min_amount)
-        external
-        returns (uint256);
+    function remove_liquidity_imbalance(uint256[2] memory _amounts, uint256 _max_burn_amount) external returns (uint256);
+    function remove_liquidity_one_coin(uint256 _token_amount, int128 i, uint256 _min_amount) external returns (uint256);
     function revert_new_parameters() external;
     function revert_transfer_ownership() external;
     function stop_ramp_A() external;

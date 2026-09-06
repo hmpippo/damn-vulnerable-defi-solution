@@ -37,9 +37,7 @@ interface IUniswapV1Exchange {
     function setup(address token_addr) external;
     function symbol() external returns (bytes32 out);
     function tokenAddress() external returns (address out);
-    function tokenToEthSwapInput(uint256 tokens_sold, uint256 min_eth, uint256 deadline)
-        external
-        returns (uint256 out);
+    function tokenToEthSwapInput(uint256 tokens_sold, uint256 min_eth, uint256 deadline) external returns (uint256 out);
     function tokenToEthSwapOutput(uint256 eth_bought, uint256 max_tokens, uint256 deadline)
         external
         returns (uint256 out);
